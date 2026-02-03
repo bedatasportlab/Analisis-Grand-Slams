@@ -1,0 +1,36 @@
+# --- DATOS (Lo más importante) ---
+# Ignoramos todo el contenido de la carpeta data
+data/raw
+
+# EXCEPCIÓN: Mantenemos los archivos .gitkeep si existen
+# Esto permite subir la estructura de carpetas vacía, pero sin los CSVs
+!data/**/.gitkeep
+
+# --- Archivos Temporales de clonación ---
+temp_sackmann_clone/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# --- Entornos Virtuales ---
+# Si creas un entorno virtual, no quieres subirlo
+venv/
+.venv/
+env/
+
+# --- Jupyter Notebooks ---
+# Ignora los puntos de control automáticos que ensucian el repo
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# --- Sistema Operativo (Windows/Mac) ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDEs (Configuraciones de editor) ---
+.vscode/
+.idea/
