@@ -1,0 +1,202 @@
+---
+title: "Análisis Exploratorio: Análisis de Grand Slams en Tenis"
+subtitle: |
+  Tarea 1 <br><br>
+  <b>Grupo BeDataSportLab</b> <br>
+  Asignatura: Últimas Tendencias en el Análisis de Datos Deportivo <br>
+  Universidad Rey Juan Carlos (MUSA)
+author:
+  - "Alba Martínez de la Hermosa"
+  - "Daniel López Paredes"
+  - "Alonso González Romero"
+date: last-modified
+date-format: "D [de] MMMM, YYYY"
+format: 
+  html:
+    theme: cosmo
+    css: style.css
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-title: "Contenido"
+    number-sections: true
+    embed-resources: true
+    code-fold: true
+    code-summary: "Ver código"
+    fig-cap-location: bottom
+    tbl-cap-location: top
+lang: es
+keywords: ["Tenis","Data-Science","Sports Analytics"]
+abstract: |
+  RELLENAR LUEGO
+execute: 
+  warning: false
+  echo: true
+---
+
+
+# Importación de librerías necesarias
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(glue)
+```
+
+# Introducción
+
+## Contexto y origen de los datos
+
+En el actual análisis, nos centraremos estudiar partidos y jugadores de tenis a través de sus resultados en los torneos de Grand Slam punto a punto. Para ello, se ha seleccionado una fuente de datos que proporciona esta información: el repositorio de datos [`tennis_slam_pointbypoint`](https://github.com/JeffSackmann/tennis_slam_pointbypoint.git). 
+
+Este repositorio nos entrega un gran nivel de detalle, ya que incluye un registro punto a punto de los torneos de Grand Slam (Open de Australia, Roland Garros, Wimbledon y US Open). Esta estructura secuencial nos permite analizar no solo los resultados finales, sino también el desarrollo de cada partido. 
+
+## Dimensión de los datos
+
+Trabajaremos con dos conjuntos de datos principales que se conectan de forma relacional: 
+
+- **Longitud temporal**: El dataset cubre más de una década de torneos de Grand Slam, abarcando desde 2011 hasta 2024. 
+
+- **Volumen**: El dataset incluye una escala masiva de eventos. Considerando que cada Grand Slam tiene 127 partidos (en formato masculino), tenemos miles de partidos y millones de puntos registrados. 
+
+## Diccionario de variables
+
+Para asegurar que interpretamos correctamente los datos, es fundamental conocer el significado de cada variable. A continuación se detallan las variables clave que componen nuestros dos datasets. 
+
+### Dataset: `matches` (Metadatos a nivel de partido)
+
+| Variable | Descripción |
+| :--- | :--- |
+| **`match_id`** | Identificador único del partido (ej. *2023-wimbledon-1101*). Es nuestra **clave primaria** para cruzar con la tabla de puntos. |
+| **`year` / `slam`** | Año de la competición y nombre del torneo de Grand Slam. |
+| **`match_num`** | Número identificador del partido dentro del torneo. |
+| **`player1` / `player2`** | Nombres completos de los jugadores. *(Nota: Por convención del dataset, se les llama P1 y P2 en el resto de variables).* |
+| **`status` / `winner`** | Indica si el partido se completó o hubo retirada, y qué jugador se llevó la victoria. |
+| **`event_name` / `round`** | Categoría (ej. *Men's Singles*) y ronda específica del torneo (1ra ronda, Cuartos de final, Final, etc.). |
+| **`court_name` / `court_id`** | Nombre e identificador numérico de la pista donde se disputó el encuentro. |
+| **`nation1` / `nation2`** | País de origen de los jugadores 1 y 2. |
+
+---
+
+### Dataset: `points` (Nivel secuencial Punto a Punto)
+
+| Variable | Descripción |
+| :--- | :--- |
+| **`match_id`** | Identificador del partido. Es nuestra **clave foránea** para unir estos datos con la tabla de `matches`. |
+| **`ElapsedTime`** | Tiempo (cronómetro) transcurrido desde el inicio del partido hasta ese punto exacto. |
+| **`SetNo` / `GameNo` / `PointNumber`** | Estructura cronológica del partido: Número de set en juego, número de juego, y el número secuencial del punto. |
+| **`P1Score` / `P2Score`** | El marcador tradicional de tenis justo en ese punto (ej. 0, 15, 30, 40, AD). |
+| **`PointServer` / `PointWinner`** | Indica quién estaba al servicio (1 = P1, 2 = P2) y quién ganó finalmente ese punto. |
+| **`Speed_KMH` / `Speed_MPH`** | Velocidad registrada del servicio (en kilómetros o millas por hora). |
+| **`Rally`** | Número total de golpes intercambiados en el punto (si es 1, suele ser un *Ace* o servicio no devuelto). |
+| **`P1Ace` / `P2Ace`** | Variable binaria (1/0) indicando si hubo un saque directo. |
+| **`P1Winner` / `P2Winner`** | Binaria; indica si el punto terminó mediante un golpe ganador (*winner*). |
+| **`P1DoubleFault` / `P2DoubleFault`** | Binaria; indica si el servidor cometió una doble falta. |
+| **`P1UnfErr` / `P1ForcedError`** | Binaria; clasifica si el error que acabó el punto fue "No forzado" (*Unforced Error*) o "Forzado" por el rival. |
+| **`P1NetPoint` / `P1NetPointWon`** | Indica si el jugador subió a la red durante el peloteo, y si logró ganar el punto al hacerlo. |
+| **`P1BreakPoint` / `P1BreakPointWon`** | Señala si el punto en juego era una oportunidad de rotura de servicio y si el restador logró aprovecharla. |
+| **`P1FirstSrvIn` / `P1SecondSrvIn`** | Señala si el jugador logró meter su primer o su segundo servicio. |
+| **`History`** | Un string en código (ej. *4R18f*) que mapea la secuencia exacta de direcciones y tipos de golpe en ese punto. |
+
+---
+
+
+# Análisis Exploratorio.  US Open 2011
+
+## Carga de datos
+
+Con el objetivo de realizar un análisis exploratorio inicial para profundizar en cada variable y en posibles relaciones entre ellas, vamos a centrarnos en un subconjunto específico de los datos: el torneo de US Open 2011. Vamos a cargar los datos correspondientes a este torneo y a realizar un análisis detallado. 
+
+```{r}
+# Cargar los datos del torneo US Open 2011
+matches <- read_csv("data/raw/matches/2011-ausopen-matches.csv")
+points <- read_csv("data/raw/points/2011-ausopen-points.csv")
+```
+
+## Análisis univariante. Matches
+
+En esta sección, realizaremos un análisis univariante de las variables presentes en el dataset `matches` para el torneo US Open 2011. Para ello, comenzaremos viendo la dimensión del dataset: 
+
+```{r}
+# Ver la dimensión del dataset matches
+dimensiones <- dim(matches)
+glue::glue("El dataset 'matches' tiene {dimensiones[1]} filas y {dimensiones[2]} columnas.")
+```
+
+A continuación, vamos a ir explorando las variables una a una: 
+
+### Variable `status`
+
+La variable `status` indica si el partido se completó o si hubo una retirada. Vamos a ver la distribución de esta variable:
+
+```{r}
+# Distribución de la variable 'status'
+status_distribution <- matches %>%
+  group_by(status) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+ggplot(status_distribution, aes(x = status, y = percentage, fill = status)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Distribución de la variable 'status'",
+       x = "Estado del partido",
+       y = "Porcentaje",
+       fill = "Estado") +
+  theme_minimal()
+
+print(status_distribution)
+```
+
+Podemos observar que un 96.6% de los partidos se completó mientras que sólo un 3.4% de los partidos tuvieron una retirada. Esto nos indica que la gran mayoría de los partidos se disputaron hasta el final, lo que es importante para nuestro análisis posterior.
+
+### Variable `event_name`
+
+Veamos qué valores toma la variable `event_name`: 
+
+```{r}
+# Distribución de la variable 'event_name'
+event_distribution <- matches %>%
+  group_by(event_name) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+print(event_distribution)
+```
+
+En el torneo Australian Open 2011, se disputaron 88 partidos en categoría masculina individual y 91 partidos en categoría femenina individual. 
+
+### Variable `round`
+
+La variable `round` indica la ronda del torneo en la que se disputó cada partido. Veamos su distribución:
+
+```{r}
+# Distribución de la variable 'round'
+round_distribution <- matches %>%
+  group_by(round) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+
+print(round_distribution)
+```
+
+Podemos observar que se jugaron las siguientes rondas: 1ra ronda, 2da ronda, 3ra ronda, 4ta ronda, Cuartos de final, Semifinales y Final. Nótese que es obvio que la mayoría de los partidos se disputaron en las primeras rondas, ya que a medida que avanzamos en el torneo, el número de partidos disminuye.
+
+### Variable `court_name`
+
+A continuación, vamos a analizar la variable `court_name`, que indica el nombre de la pista donde se disputó cada partido. Veamos en qué pistas se jugaron los partidos del torneo Australian Open 2011:
+
+```{r}
+# Distribución de la variable 'court_name'
+court_distribution <- matches %>%
+  group_by(court_name) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100)
+print(court_distribution)
+```
+
+Los resultados arrojan una gran variedad de pistas, 7 en total. Cabe destacar que la pista más usada 'Rod Laver Arena' fue la que albergó el 30.2% de los partidos, seguida de 'Hisense Arena' con un 16.2%. Las pistas 6 y 8 fueron las menos utilizadas, albergando sólo el 7.82% de los partidos cada una. 
+
+
+
+
