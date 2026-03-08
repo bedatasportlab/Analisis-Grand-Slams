@@ -88,7 +88,7 @@ Para asegurar que interpretamos correctamente los datos, es fundamental conocer 
 | **`SetNo` / `GameNo` / `PointNumber`** | Estructura cronológica del partido: Número de set en juego, número de juego, y el número secuencial del punto. |
 | **`P1Score` / `P2Score`** | El marcador tradicional de tenis justo en ese punto (ej. 0, 15, 30, 40, AD). |
 | **`PointServer` / `PointWinner`** | Indica quién estaba al servicio (1 = P1, 2 = P2) y quién ganó finalmente ese punto. |
-| **`Speed_KMH` / `Speed_MPH`** | Velocidad registrada del servicio (en kilómetros o millas por hora). |
+| **`Speed_KMH` / `Speed_MPH`** | Velocidad regilstrada del servicio (en kilómetros o millas por hora). |
 | **`Rally`** | Número total de golpes intercambiados en el punto (si es 1, suele ser un *Ace* o servicio no devuelto). |
 | **`P1Ace` / `P2Ace`** | Variable binaria (1/0) indicando si hubo un saque directo. |
 | **`P1Winner` / `P2Winner`** | Binaria; indica si el punto terminó mediante un golpe ganador (*winner*). |
@@ -197,6 +197,244 @@ print(court_distribution)
 
 Los resultados arrojan una gran variedad de pistas, 7 en total. Cabe destacar que la pista más usada 'Rod Laver Arena' fue la que albergó el 30.2% de los partidos, seguida de 'Hisense Arena' con un 16.2%. Las pistas 6 y 8 fueron las menos utilizadas, albergando sólo el 7.82% de los partidos cada una. 
 
+### Variable `player1` y `player2`
+
+En esta sección, vamos a analizar conjuntamente las variables `player1` y `player2`. El objetivo será sacar conclusiones acerca del número de partidos disputados por cada jugador. 
+
+Para ello, vamos a contar el número de partidos disputados por cada jugador, como local y como visitante, y luego sumaremos ambos para obtener el total de partidos disputados por cada jugador. 
+
+```{r}
+# 1. Contamos P1 y renombramos a "player"
+player_matches_local <- matches %>%
+  count(player1, name = "count_local") %>%
+  rename(player = player1)
+
+# 2. Contamos P2 y renombramos a "player"
+player_matches_visitor <- matches %>%
+  count(player2, name = "count_visitor") %>%
+  rename(player = player2)
+
+# 3. Unimos (ahora ambos tienen la columna "player", así que es directo)
+player_matches <- full_join(player_matches_local, player_matches_visitor, by = "player") %>%
+  mutate(
+    count_local = coalesce(count_local, 0),
+    count_visitor = coalesce(count_visitor, 0),
+    total_matches = count_local + count_visitor
+  ) %>%
+  arrange(desc(total_matches))
+
+# Vemos el resultado
+head(player_matches)
+
+```
+
+Observamos que los jugadores con más partidos disputados fueron: 
+
+- Andy Murray y Novak Djokovic, con 7 partidos cada uno en categoría masculina. 
+- Kim Clijsters y Na Li, con 7 partidos cada una en categoría femenina.
+
+
+### Variable `nation1` y `nation2`
+
+En esta sección nuestro objetivo es analizar conjuntamente las variables `nation1` y `nation2`, que indican el país de origen de los jugadores 1 y 2 respectivamente. El objetivo será sacar conclusiones acerca de cuántos jugadores de cada país participaron en el torneo Australian Open 2011. 
+
+Para ello, vamos a hacer lo siguiente: 
+
+
+```{r}
+
+jugadores_1 <- matches %>%
+  select(player1, nation1) %>% 
+  rename(player = player1, nation = nation1)
+
+jugadores_2 <- matches %>%
+  select(player2, nation2) %>%
+  rename(player = player2, nation = nation2)
+
+jugadores_paises <- union(jugadores_1, jugadores_2) %>%
+  group_by(nation) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+
+# Hacemos un pequeño gráfico del top 8 países con más jugadores con una paleta de colores personalizada. 
+
+# 1. Filtramos el top 8 (usando slice_max, que es la versión moderna y recomendada)
+top_paises <- jugadores_paises %>%
+  slice_max(order_by = count, n = 8)
+
+# 2. Gráfico mejorado
+ggplot(top_paises, aes(x = count, y = reorder(nation, count), fill = nation)) +
+  
+  # geom_col() es el equivalente moderno a geom_bar(stat = "identity")
+  # show.legend = FALSE quita la leyenda lateral que no aporta información nueva
+  geom_col(show.legend = FALSE, alpha = 0.9) +
+  
+  # Añadimos las etiquetas de texto al final de cada barra
+  geom_text(aes(label = count), hjust = -0.5, size = 5, fontface = "bold", color = "gray20") +
+  
+  # Paleta de colores personalizada (puedes cambiarla por "Set1", "Set2", "Dark2"...)
+  # También podrías usar scale_fill_viridis_d() para colores científicos
+  scale_fill_brewer(palette = "Set3") +
+  
+  # Le damos un poco más de margen al eje X para que los números no se corten
+  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+  
+  # Títulos y textos mejorados
+  labs(
+    title = "Top 8 Países con Más Jugadores",
+    subtitle = "Australian Open 2011 (Cuadro Principal)",
+    x = "Número de jugadores",
+    y = NULL # Quitamos el título del eje Y porque es obvio que son países
+  ) +
+  
+  # Un tema minimalista de base, pero lo tuneamos
+  theme_minimal(base_size = 14) +
+  theme(
+    # Hacemos el título más grande e imponente
+    plot.title = element_text(face = "bold", size = 18, margin = margin(b = 5)),
+    plot.subtitle = element_text(color = "gray40", size = 14, margin = margin(b = 15)),
+    # Los nombres de los países en negrita para que destaquen
+    axis.text.y = element_text(face = "bold", size = 12, color = "black"),
+    # Quitamos las líneas de cuadrícula innecesarias para un look más limpio
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    # Quitamos el texto del eje X numérico si prefieres que la vista vaya a las barras directamente
+    # axis.text.x = element_blank() # Descomenta esto si quieres ocultar los números de abajo
+  )
+
+```
+
+Observamos que Rusia fue el país con más jugadores en el torneo Australian Open 2011, con un total de 19 jugadores, seguido de Francia y Australia con 14 jugadores. España obtuvo una representación de un total de 13 jugadores.
+
+```{r}
+rm(list = ls())
+```
+
+## Análisis univariante y bivariante. Points
+
+En esta sección, realizaremos un análisis univariante y bivariante de los puntos obtenidos por los jugadores en el torneo Australian Open 2011.
+
+Comenzamos cargando los datos de puntos y haciiendo un primer vistazo a sus filas y dimensiones: 
+
+
+```{r}
+
+# Cargar los datos. 
+
+points <- read_csv("data/raw/points/2011-ausopen-points.csv")
+
+glue::glue("El dataset 'points' tiene {dim(points)[1]} filas y {dim(points)[2]} columnas.")
+
+head (points)
+```
+
+Una vez hemos visto las primeras filas del dataset, vamos a analizar las distintas variables y a buscar posibles relaciones entre ellas. 
+
+
+### Variable `elapsedTime`.
+
+La variable `elapsedTime` indica el tiempo transcurrido desde el inicio del partido hasta ese punto exacto. A partir de aquí surgen dos preguntas interesantes: 
+
+- ¿Cuál es la distribución del tiempo transcurrido durante un punto?
+- ¿Cuál es la distribución del tiempo transcurrido durante un partido completo en el torneo Australian Open 2011?
+
+#### Distribución del tiempo transcurrido durante un punto. 
+
+Para analizar la distribución del tiempo transcurrido durante un punto, comenzamos calculando el tiempo "gastado" en cada punto, es decir, la diferencia entre el `elapsedTime` del punto actual y el `elapsedTime` del punto anterior dentro del mismo partido. Luego, visualizaremos esta distribución con un histograma.
+
+
+```{r}
+# Calculamos el tiempo gastado en cada punto
+
+elapsed_time_points <- points %>%
+  group_by(match_id) %>%
+  arrange(ElapsedTime) %>%
+  mutate(time_spent = ElapsedTime - lag(ElapsedTime, default = 0)) %>%
+  ungroup()
+
+# Visualizamos la distribución del tiempo gastado en cada punto
+ggplot(elapsed_time_points, aes(x = time_spent)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.7) +
+  labs(title = "Distribución del Tiempo Gastado en Cada Punto",
+       x = "Tiempo gastado (segundos)",
+       y = "Frecuencia") +
+  theme_minimal()
+
+# También sacamos estadísticas descriptivas para entender mejor esta variable
+summary(elapsed_time_points$time_spent)
+```
+
+
+#### Distribución del tiempo transcurrido durante un partido completo.
+
+Para analizar la distribución del tiempo transcurrido durante un partido completo, vamos a quedarnos con el tiempo máximo en la variable `elapsedTime` para cada partido, que nos indicará el tiempo total que duró cada partido. Luego, visualizaremos esta distribución con un histograma y sacaremos estadísticas descriptivas.
+
+```{r}
+
+# Calculamos el tiempo total de cada partido (tiempo máximo en elapsedTime)
+
+elapsed_time_matches <- points %>%
+  group_by(match_id) %>%
+  summarise(total_time = max(ElapsedTime))
+
+# Visualizamos la distribución del tiempo total de cada partido
+ggplot(elapsed_time_matches, aes(x = total_time)) +
+  geom_density(binwidth = 300, fill = "coral", color = "black", alpha = 0.7) +
+  labs(title = "Distribución del Tiempo Total de Cada Partido",
+       x = "Tiempo total (segundos)",
+       y = "Frecuencia") +
+  theme_minimal()
+
+# Sacamos estadísticas descriptivas para entender mejor esta variable
+summary(elapsed_time_matches$total_time)
+```
+
+Observamos que el tiempo medio es de 7419 segundos (aproximadamente 2 horas y 3 minutos), mientras que el máximo es de 17295 segundos (aproximadamente 4 horas y 48 minutos). 
+
+#### ¿Existen diferencias significativas entre los partidos masculinos y femeninos en cuanto al tiempo total de duración?
+
+Para analizar si existen diferencias significativas entre los partidos masculinos y femeninos en cuanto al tiempo total de duración. Actualmente tenemos el tiempo total de cada partido. Vamos a hacer un join con el dataset `matches` para obtener la información de si el partido es masculino o femenino, y luego realizaremos un test estadístico (t-test) para comparar las medias de ambos grupos.
+
+```{r}
+# Unimos con el dataset matches para obtener la información de si el partido es masculino o femenino
+matches <- read_csv("data/raw/matches/2011-ausopen-matches.csv")
+
+elapsed_time_matches <- elapsed_time_matches %>%
+  left_join(matches %>% select(match_id, event_name), by = "match_id") %>%
+  mutate(gender = ifelse(grepl("Men", event_name), "Men", "Women"))
+
+# Realizamos un t-test para comparar las medias de ambos grupos
+t_test_result <- t.test(total_time ~ gender, data = elapsed_time_matches)
+# Imprimimos el resultado del t-test
+print(t_test_result)
+
+# Graficamos la densidad ahora agrupada por género para visualizar mejor las diferencias
+
+ggplot(elapsed_time_matches, aes(x = total_time, fill = gender)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Distribución del Tiempo Total de Cada Partido por Género",
+       x = "Tiempo total (segundos)",
+       y = "Densidad",
+       fill = "Género") +
+  theme_minimal()
+
+```
+
+Observamos que el p-valor del t-test es menor que 0.05, lo que indica que hay una diferencia estadísticamente significativa entre los partidos masculinos y femeninos en cuanto al tiempo total de duración. Además, la gráfica de densidad muestra que los partidos masculinos tienden a durar más que los partidos femeninos.
+
+Los hombres, en media tienen un tiempo total de 8742.25 segundos, mientras que las mujeres tienen un tiempo total medio de 6138.42 segundos. 
+
+El IC del 95% nos dice que la diferencia en media entre partidos de hombres y mujeres durante el torneo Australian Open 2011 está entre 1228.9 segundos y 3378.7 segundos, lo que refuerza la conclusión de que los partidos masculinos tienden a durar más que los femeninos.
+
+Esto tiene sentido ya que los partidos masculinos se juegan al mejor de 5 sets, mientras que los partidos femeninos se juegan al mejor de 3 sets, lo que explica la mayor duración de los partidos masculinos.
+
+Por lo tanto, nos surge la siguiente pregunta: 
+
+¿Existen diferencias significativas en la duración de un set entre partidos masculinos y femeninos?
+
+#### ¿Existen diferencias significativas en la duración de un set entre partidos masculinos y femeninos?
 
 
 
+
+### ¿Existen diferencias significativas entre los distintos países en cuanto a la cantidad de intercambios de bola por punto?
