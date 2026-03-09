@@ -432,9 +432,181 @@ Por lo tanto, nos surge la siguiente pregunta:
 
 ¿Existen diferencias significativas en la duración de un set entre partidos masculinos y femeninos?
 
+La responderemos más adelante, cuando analicemos la variable `SetNo`.
+
+### Variable `SetNo`. 
+
+En cuanto al número de sets, vamos a comenzar analizando la distribución del número de sets jugados por partido:
+
+
+```{r}
+# Distribución del número de sets jugados por partido
+
+sets_per_match <- points %>%
+  group_by(match_id) %>%
+  summarise(num_sets = max(SetNo))
+
+ggplot(sets_per_match, aes(x = num_sets)) +
+  geom_bar(fill = "lightblue", color = "black") +
+  labs(title = "Distribución del Número de Sets Jugados por Partido",
+       x = "Número de Sets",
+       y = "Frecuencia") +
+  theme_minimal()
+
+```
+
+Observamos que en la mayoría de los partidos se jugaron 3 sets, siendo el segundo mayor valor 2 sets. Destaca que haya partidos en los que se haya jugado 1 solo set, pero esto se debe a que hubo partidos que no se completaron debido a retiradas. 
+
+A continuación, vamos a analizar la posible relación entre el tiempo total de duración de un set y algunas variables categóricas como el género o la ronda del torneo.
+
 #### ¿Existen diferencias significativas en la duración de un set entre partidos masculinos y femeninos?
 
+Para responder a esta pregunta, vamos a calcular el tiempo total de duración de cada set jugado en cada partido. Tras ello cruzaremos con la tabla `matches` para obtener la información de si el partido es masculino o femenino, y luego realizaremos un test estadístico (t-test) para comparar las medias de ambos grupos.
+
+```{r}
+
+# Calculamos el tiempo total de duración de cada set
+
+elapsed_time_sets <- points %>%
+  group_by(match_id, SetNo) %>%
+  summarise(set_time = max(ElapsedTime) - min(ElapsedTime)) %>%
+  ungroup()
+
+# Unimos con el dataset matches para obtener la información de si el partido es masculino o femenino
+
+elapsed_time_sets <- elapsed_time_sets %>%
+  left_join(matches %>% select(match_id, event_name), by = "match_id") %>%
+  mutate(gender = ifelse(grepl("Men", event_name), "Men", "Women")) %>%
+  select(-event_name)
+
+
+# Realizamos un t-test para comparar las medias de ambos grupos
+t_test_sets_result <- t.test(set_time ~ gender, data = elapsed_time_sets)
+# Imprimimos el resultado del t-test
+
+print(t_test_sets_result)
+
+# Graficamos la densidad ahora agrupada por género para visualizar mejor las diferencias
+
+ggplot(elapsed_time_sets, aes(x = set_time, fill = gender)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Distribución del Tiempo Total de Cada Set por Género",
+       x = "Tiempo total del set (segundos)",
+       y = "Densidad",
+       fill = "Género") +
+  theme_minimal()
+
+```
+
+Podemos observar que con un nivel de signficancia del 0.05, el p-valor del t-test es menor que 0.05, lo que indica que hay una diferencia estadísticamente significativa entre los sets de partidos masculinos y femeninos en cuanto al tiempo total de duración.
+
+
+#### ¿Existe algún tipo de relación entre la duración de un set y la ronda del torneo?
+
+Para responder a esta pregunta, vamos a cruzar la duración de cada set con la información de la ronda del torneo, que se encuentra en el dataset `matches`. Tras ello, vamos a visualizar la relación a través de un Boxplot. 
+
+
+```{r}
+# Unimos con el dataset matches para obtener la información de la ronda del torneo
+
+elapsed_time_sets <- elapsed_time_sets %>%
+  left_join(matches %>% select(match_id, round), by = "match_id") %>%
+  select(-match_id)
+
+# Realizamos un Boxplot para visualizar la relación entre la duración de un set y la ronda del torneo
+
+elapsed_time_sets$round <- factor(elapsed_time_sets$round, levels = c("Round 1", "Round 2", "Round 3", "Round 4", "Quarters", "Semis", "Final"))
+
+ggplot(elapsed_time_sets, aes(x = round, y = set_time)) +
+  geom_boxplot(fill = "lightgreen", color = "black") +
+  labs(title = "Duración de un Set por Ronda del Torneo",
+       x = "Ronda del torneo",
+       y = "Duración del set (segundos)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Se observa bastante lineal aunque parece una ligera tendencia a que cuanto mayor es la ronda, mayor es la duración de los sets. 
+
+Veamos si esta tendencia es estadísticamente significativa a través del test estadístico de la correlación de Spearman, que es un test no paramétrico que mide la fuerza y dirección de la asociación entre dos variables ordinales o continuas.
+
+```{r}
+# Realizamos el test de correlación de Spearman
+correlation_result <- cor.test(as.numeric(elapsed_time_sets$round), as.numeric(elapsed_time_sets$set_time), method = "spearman")
+# Imprimimos el resultado del test de correlación
+print(correlation_result)
+```
+
+Observamos que el p-valor del test de correlación de Spearman es menor que 0.05, lo que indica que hay una correlación estadísticamente significativa entre la ronda del torneo y la duración de un set. Además, el coeficiente de correlación es positivo, lo que indica que a medida que avanzamos en las rondas del torneo, la duración de los sets tiende a aumentar.
+
+```{r}
+rm(list = ls())
+
+points <- read_csv("data/raw/points/2011-ausopen-points.csv")
+matches <- read_csv("data/raw/matches/2011-ausopen-matches.csv")
+```
+
+### Variable `GameNo`
+
+Vamos a profundizar en la variable `GameNo`, que indica el número de juego dentro de un set. El objetivo será ver el número de juegos que se producen en cada partido y ver su distribución a través de la gráfica de su densidad. 
+
+```{r}
+# Calculamos el número de juegos por partido
+
+games_per_match <- points %>%
+  group_by(match_id) %>%
+  summarise(num_games = max(GameNo))
+
+# Visualizamos la distribución del número de juegos por partido
+
+ggplot(games_per_match, aes(x= num_games)) +
+  geom_density(fill = "lightcoral", color = "black", alpha = 0.7) +
+  labs(title = "Distribución del Número de Juegos por Partido",
+       x = "Número de juegos",
+       y = "Densidad") +
+  theme_minimal()
+
+
+```
+
+Si observamos la gráfica de densidad, observamos que tiene dos picos, uno por debajo de los diez juegos y otro entre los 10 y los 20 juegos.
+
+Esto tiene sentido si se juegan partidos a mejor de 3 sets, ya que el número mínimo de juegos totales es 12 (una sóla combinación) y a partir de ahí, para jugar X juegos la combinación de sets y juegos dentro de cada set puede ser muy variada. 
+
+Por ejemplo: 
+
+- Para jugar 12 juegos, la única combinación posible es que se jueguen 2 sets y que cada set se decida por un marcador de 6-0.
+- Para jugar 13 juegos, la combinación más común es que se jueguen 2 sets y que uno de los sets se decida por un marcador de 6-0 y el otro set se decida por un marcador de 6-1.
+- Para jugar 14 juegos, la combinación más común es que se jueguen 2 sets y que ambos sets se decidan por un marcador de 6-1. O 6-0 y 6-2. 
+
+- Para jugar 15 juegos, (6-0, 6-3), (6-3, 6-0), (6-1, 6-2), (6-2, 6-1). 
+- Para jugar 16 juegos, hay 5 combinaciones posibles
+
+
+Por lo tanto es normal que la distribución del número de juegos por partido tenga esos picos. 
+
+
+### Variable `PointNumber`
+
+La variable `PointNumber` indica el número secuencial del punto dentro de un partido. Vamos a analizar la distribución del número de puntos por partido. 
+
+```{r}
+# Calculamos el número de puntos por partido
+points_per_match <- points %>%
+  group_by(match_id) %>%
+  summarise(num_points = max(PointNumber))
+
+# Visualizamos la distribución del número de puntos por partido
+ggplot(points_per_match, aes(x = num_points)) +
+  geom_density(fill = "lightseagreen", color = "black", alpha = 0.7) +
+  labs(title = "Distribución del Número de Puntos por Partido",
+       x = "Número de puntos",
+       y = "Densidad") +
+  theme_minimal()
+```
 
 
 
-### ¿Existen diferencias significativas entre los distintos países en cuanto a la cantidad de intercambios de bola por punto?
+
+

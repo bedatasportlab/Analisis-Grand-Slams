@@ -1,0 +1,44 @@
+---
+title: "Aprendizaje No Supervisado: Análisis de Grand Slams en Tenis"
+subtitle: |
+  Tarea 1 <br><br>
+  <b>Grupo BeDataSportLab</b> <br>
+  Asignatura: Últimas Tendencias en el Análisis de Datos Deportivo <br>
+  Universidad Rey Juan Carlos (MUSA)
+author:
+  - "Alba Martínez de la Hermosa"
+  - "Daniel López Paredes"
+  - "Alonso González Romero"
+date: last-modified
+date-format: "D [de] MMMM, YYYY"
+format: 
+  html:
+    theme: cosmo
+    css: style.css
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-title: "Contenido"
+    number-sections: true
+    embed-resources: true
+    code-fold: true
+    code-summary: "Ver código"
+    fig-cap-location: bottom
+    tbl-cap-location: top
+lang: es
+keywords: ["Tenis","Data-Science","Sports Analytics"]
+abstract: |
+  RELLENAR LUEGO
+execute: 
+  warning: false
+  echo: true
+---
+
+# Clustering k-means para agrupar partidos según sus características.
+
+
+# Clustering jerárquico para agrupar a tenistas según su estilo de juego. 
+
+
+# Análisis longitudinal sobre un tenista. Evaluar sus partidos para ver si tiene algún tipo de estrategia o patrón de juego. (Series temporales y DTW)
+
